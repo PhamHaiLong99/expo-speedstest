@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "expo-speedstest": ["../src/index"],
+      "expo-speedstest/*": ["../src/*"]
+    }
+  }
+}
