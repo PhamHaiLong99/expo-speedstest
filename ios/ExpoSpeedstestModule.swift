@@ -1,44 +1,73 @@
 import ExpoModulesCore
-
-public class ExpoSpeedstestModule: Module {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
-  public func definition() -> ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('ExpoSpeedstest')` in JavaScript.
-    Name("ExpoSpeedstest")
-
-    // Sets constant properties on the module. Can take a dictionary or a closure that returns a dictionary.
-    Constants([
-      "PI": Double.pi
-    ])
-
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      return "Hello world! 👋"
+public class ExpoSpeedstestModule: Module{
+    //  private var sut: HostsProviderService?
+    lazy var speedtestService = {
+        SpeedTestService()
+    }()
+    lazy var downloadService = {
+        CustomHostDownloadService()
+    }()
+    lazy var uploadService = {
+        CustomHostUploadService()
+    }()
+    lazy var speedtest = {
+        SpeedTest(
+            // hosts: speedtestService, ping: DefaultHostPingService()
+            )
+    }()
+    private let standartTimeout: TimeInterval = 5
+    private let fileSize: Int = 10000000
+    public func definition() -> ModuleDefinition {
+        Name("ExpoSpeedstest")
+        Constants([ "PI": Double.pi])
+        Events("onChange")
+        AsyncFunction("checkInternet") { (promise: Promise) in
+            self.speedtestService.getHosts(max: 1, timeout: standartTimeout) { result in
+                switch result {
+                case .error(let error):
+                    log.error(error)
+                    promise.reject(InternetError())
+                case .value(let hosts):
+                    log.info("Success \(hosts.count))")
+                    promise.resolve("Success")
+                }
+            }
+        }
+        AsyncFunction("downloadSpeedTest") { (promise: Promise) in
+            self.downloadService.test(URL(string: "http://speedtest.fpt.vn.prod.hosts.ooklaserver.net:8080/download?size=\(self.fileSize)")!,
+                                      fileSize:  10000000,
+                                      timeout: self.standartTimeout,
+                                      current: { (speed, average) in
+                log.info("Speed: \(speed), average: \(average)")
+            },
+                                      final: { (result) in
+                switch result {
+                case .error(let error):
+                      log.error(error)
+                      promise.reject(DownLoadSpeedTestError())
+                  case .value(let speed):
+                      log.info("Success \(speed)")
+                      promise.resolve("\(speed)")
+                  }
+            })
+        }
+        AsyncFunction("uploadSpeedTest") { (promise: Promise) in
+            self.uploadService.test(URL(string: "http://speedtest.fpt.vn.prod.hosts.ooklaserver.net:8080/speedtest/upload")!,
+            fileSize: self.fileSize,
+            timeout: self.standartTimeout,
+            current: { (speed, average) in
+                log.info("Speed: \(speed), average: \(average)")
+            },
+            final: { result in 
+                switch result {
+                  case .error(let error):
+                      log.error(error)
+                      promise.reject(UpLoadSpeedTestError())
+                  case .value(let speed):
+                      log.info("Success \(speed)")
+                      promise.resolve("\(speed)")
+                  }
+            })
+        }
     }
-
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { (value: String) in
-      // Send an event to JavaScript.
-      self.sendEvent("onChange", [
-        "value": value
-      ])
-    }
-
-    // Enables the module to be used as a native view. Definition components that are accepted as part of the
-    // view definition: Prop, Events.
-    View(ExpoSpeedstestView.self) {
-      // Defines a setter for the `name` prop.
-      Prop("name") { (view: ExpoSpeedstestView, prop: String) in
-        print(prop)
-      }
-    }
-  }
 }
